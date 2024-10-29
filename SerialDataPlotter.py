@@ -157,13 +157,19 @@ class Widget(QtWidgets.QWidget):
         )
         tab1_layout.addWidget(self.scan_ble_btn, 0, 2)
 
+        #tab3_layout.addWidget(QtWidgets.QLabel("CSV Path:"), 0, 0)
+        
         self.write_csv_btn = QtWidgets.QPushButton(
             text="Write to CSV",
             clicked=self.write_to_csv
         )
 
+        self.csvpath_le = QtWidgets.QLineEdit(config['csvpath'])
+        
         tab1_layout.addWidget(self.write_csv_btn, 0, 3)
-        tab1_layout.addWidget(self.graph, 1, 0, 1, 4)
+        tab1_layout.addWidget(self.csvpath_le, 0, 4)
+
+        tab1_layout.addWidget(self.graph, 1, 0, 1, 5)
         tab_widget.addTab(tab1, "Graph")
 
         # Second tab
@@ -179,15 +185,15 @@ class Widget(QtWidgets.QWidget):
         # Third tab
         tab3 = QtWidgets.QWidget()
         tab3_layout = QtWidgets.QGridLayout(tab3)
-        # Add CSV path edit field
-        tab3_layout.addWidget(QtWidgets.QLabel("CSV Path:"), 0, 0)
-        self.csvpath_le = QtWidgets.QLineEdit(config['csvpath'])
-        tab3_layout.addWidget(self.csvpath_le, 0, 1)
+        # # Add CSV path edit field
+        # tab3_layout.addWidget(QtWidgets.QLabel("CSV Path:"), 0, 0)
+        # self.csvpath_le = QtWidgets.QLineEdit(config['csvpath'])
+        # tab3_layout.addWidget(self.csvpath_le, 0, 1)
 
 
 
-        tab3_layout.addWidget(QtWidgets.QLabel("Config file:"),1,0)
-        tab3_layout.addWidget(self.config_te,1,1)
+        tab3_layout.addWidget(QtWidgets.QLabel("Config file:"),0,0)
+        tab3_layout.addWidget(self.config_te,1,0)
         self.config_te.setPlainText(json.dumps(config, indent=4))
 
         tab_widget.addTab(tab3, "Config")
