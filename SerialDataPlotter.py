@@ -15,6 +15,8 @@
 
 import SDP_Config as SDP
 import SDP_BLE as BLE
+from SDP_BLE import BLEScannerWindow
+
 import asyncio
 from qasync import QEventLoop, asyncSlot
 
@@ -148,12 +150,20 @@ class Widget(QtWidgets.QWidget):
         tab1_layout = QtWidgets.QGridLayout(tab1)
         tab1_layout.addWidget(self.connect_btn, 0, 0)
         tab1_layout.addWidget(self.comport_le, 0, 1)
+        # Add BLE scan button
+        self.scan_ble_btn = QtWidgets.QPushButton(
+            text="Scan BLE",
+            clicked=self.open_ble_scanner
+        )
+        tab1_layout.addWidget(self.scan_ble_btn, 0, 2)
+
         self.write_csv_btn = QtWidgets.QPushButton(
             text="Write to CSV",
             clicked=self.write_to_csv
         )
-        tab1_layout.addWidget(self.write_csv_btn, 0, 2)
-        tab1_layout.addWidget(self.graph, 1, 0, 1, 3)
+
+        tab1_layout.addWidget(self.write_csv_btn, 0, 3)
+        tab1_layout.addWidget(self.graph, 1, 0, 1, 4)
         tab_widget.addTab(tab1, "Graph")
 
         # Second tab
@@ -174,6 +184,8 @@ class Widget(QtWidgets.QWidget):
         self.csvpath_le = QtWidgets.QLineEdit(config['csvpath'])
         tab3_layout.addWidget(self.csvpath_le, 0, 1)
 
+
+
         tab3_layout.addWidget(QtWidgets.QLabel("Config file:"),1,0)
         tab3_layout.addWidget(self.config_te,1,1)
         self.config_te.setPlainText(json.dumps(config, indent=4))
@@ -191,6 +203,16 @@ class Widget(QtWidgets.QWidget):
         self.timer.setInterval(config['refresh'])
         self.timer.timeout.connect(self.update_plot)
         self.timer.start()
+
+    def open_ble_scanner(self):
+        self.ble_scanner_window = BLEScannerWindow()
+        self.ble_scanner_window.device_selected.connect(self.handle_device_selected)
+        self.ble_scanner_window.show()
+
+    def handle_device_selected(self, address):
+        print(f"Selected device address: {address}")
+        self.comport_le.setText(F"Address {address}")
+        # Handle the selected device address (e.g., connect to the device)
 
 
     #@QtCore.pyqtSlot()
