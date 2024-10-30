@@ -286,6 +286,7 @@ class Widget(QtWidgets.QWidget):
                     baudRate=QtSerialPort.QSerialPort.Baud115200,
                     readyRead=self.receive
                 )   
+                config['com'] = address
                 if not self.serial.isOpen():
                     if not self.serial.open(QtCore.QIODevice.ReadWrite):
                         self.connect_btn.setChecked(False)
