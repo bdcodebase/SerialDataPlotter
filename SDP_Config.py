@@ -1,7 +1,5 @@
-
 # Project: Serial Data Plotter
 # provides default config for SerialDataPlotter.py
-# Author: Benno Dömer
 
 import json
 
