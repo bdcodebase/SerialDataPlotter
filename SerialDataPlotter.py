@@ -28,25 +28,6 @@ import json
 import os
 import argparse
 
-# command line arguments (overwrite options from config file)
-parser = argparse.ArgumentParser(description='Liveplot from serial port')
-parser.add_argument("--com", help="COM Port", default=None)
-parser.add_argument("--plots", type=int, help="Number of Plots", default=None)
-parser.add_argument("--samples", type=int, help="Number of samples per plot", default=None)
-parser.add_argument("--config", help="config file", default=None)
-
-args = parser.parse_args()
-configlog = '[-PC-] Welcome! Starting session at ' + QtCore.QDateTime.currentDateTime().toString('yyyy-MM-dd hh:mm:ss')
-
-# if args.config is not None:
-#     try:    
-#         config = SDP.parseconfig(args.config) 
-#     except (json.JSONDecodeError, FileNotFoundError) as e:
-#         config = SDP.getdefaultconfig()
-#         configlog = configlog + f'\n[-PC-] Error reading config file "{args.config}": {e}. Using default config.'
-# else:
-#     config = SDP.getdefaultconfig()
-
 
 class Widget(QtWidgets.QWidget):
     def __init__(self, parent=None, config_file=None, com=None, plots=None, samples=None):
@@ -60,19 +41,7 @@ class Widget(QtWidgets.QWidget):
         if samples is not None:
             self.config['samples'] = samples    
         
-        self.setWindowTitle(self.config['title'])
-        # Set up the basic variables
-        # if args.com is not None: # command line argument has higher priority
-        #     config['com'] = args.com
-     
-        # if args.plots is not None:  # command line argument has higher priority
-        #     config['plots'] = args.plots
-       
-        # if args.samples is not None: # command line argument has higher priority
-        #     config['samples'] = args.samples
-         
-        self.fastautoscale = True if self.config['autoscaleinterval'] > 0 else False
-
+        
         self.ble = BLE.BLE()
         self.useBLE = False
         self.connected = False
@@ -80,18 +49,27 @@ class Widget(QtWidgets.QWidget):
         self.file = None
 
         self.idx = 0
-        self.ax = []    # list of axes
-        self.plt = []   # list of plots
-        self.label_items = []  # list of label items for live values
-
-        self.margin = 2.5
-
+        self.fastautoscale = True if self.config['autoscaleinterval'] > 0 else False
+        
         self.data = []
         for i in range(self.config['plots']):
             self.data.append([0]*self.config['samples'])
             #self.data[i][self.config['samples']-1] = 1
 
-        # Set up the user interface: Tab 1
+        self.InitUI()
+        # Set up the timer for updating the plot
+        self.timer = QtCore.QTimer()
+        self.timer.setInterval(self.config['refresh'])
+        self.timer.timeout.connect(self.update_plot)
+        self.timer.start()
+
+    def InitUI(self):
+        self.setWindowTitle(self.config['title'])
+        self.ax = []    # list of axes
+        self.plt = []   # list of plots
+        self.label_items = []  # list of label items for live values
+
+        self.margin = 2.5
         self.message_le = QtWidgets.QLineEdit(
             text="h",
             returnPressed=self.send)
@@ -188,19 +166,14 @@ class Widget(QtWidgets.QWidget):
         tab2_layout.addWidget(self.send_btn, 0, 0)
         tab2_layout.addWidget(self.message_le, 0, 1)
         tab2_layout.addWidget(self.output_te, 1, 0, 1, 2)
-        self.output_te.setPlainText(configlog)
+        self.output_te.setPlainText('[-PC-] Welcome! Starting session at ' + QtCore.QDateTime.currentDateTime().toString('yyyy-MM-dd hh:mm:ss'))
+        
+    
         tab_widget.addTab(tab2, "Terminal")
 
         # Third tab
         tab3 = QtWidgets.QWidget()
         tab3_layout = QtWidgets.QGridLayout(tab3)
-        # # Add CSV path edit field
-        # tab3_layout.addWidget(QtWidgets.QLabel("CSV Path:"), 0, 0)
-        # self.csvpath_le = QtWidgets.QLineEdit(self.config['csvpath'])
-        # tab3_layout.addWidget(self.csvpath_le, 0, 1)
-
-
-
         tab3_layout.addWidget(QtWidgets.QLabel("Config file:"),0,0)
         tab3_layout.addWidget(self.config_te,1,0)
         self.config_te.setPlainText(json.dumps(self.config, indent=4))
@@ -212,12 +185,7 @@ class Widget(QtWidgets.QWidget):
 
         # Set the main layout as the layout for the main window
         self.setLayout(main_layout)
-      
-        # Set up the timer for updating the plot
-        self.timer = QtCore.QTimer()
-        self.timer.setInterval(self.config['refresh'])
-        self.timer.timeout.connect(self.update_plot)
-        self.timer.start()
+
 
     def load_config(self, config_file):
         if config_file:
@@ -237,8 +205,7 @@ class Widget(QtWidgets.QWidget):
     def handle_device_selected(self, address):
         print(f"Selected device address: {address}")
         self.comport_le.setText(F"Address {address}")
-        # Handle the selected device address (e.g., connect to the device)
-
+ 
 
     #@QtCore.pyqtSlot()
     def parseLine(self, line):
@@ -259,7 +226,6 @@ class Widget(QtWidgets.QWidget):
     def receive(self,sender=None,data=None):
         if self.useBLE:
             #print(f'data: {data}, Type: {type(data)}')
-            
             line = data.decode("utf-8") #str(data)#self.ble.client.recv()
             if self.raw_cb.isChecked():
                 self.output_te.append(line.rstrip('\r\n'))
@@ -296,7 +262,6 @@ class Widget(QtWidgets.QWidget):
                 address = address.replace("Address ", "")
                 self.output_te.append(F"[-PC-] Connecting to {address}")
                 await self.ble.connect_to_device(address,self.receive)
-                #self.ble.client.start_notify(self.ble.rx_char_uuid, self.receive)
                 self.connected = True
                 self.useBLE = True
             else: # Serial
@@ -323,7 +288,6 @@ class Widget(QtWidgets.QWidget):
        
     def write_to_csv(self):
         if self.file is None:
-            #filename = self.config['csvpath'].replace('<home>', os.path.expanduser('~'))
             filename = self.csvpath_le.text().replace('<home>', os.path.expanduser('~')) \
                                              .replace('<date>', QtCore.QDateTime.currentDateTime().toString('yyyy-MM-dd')) \
                                              .replace('<time>', QtCore.QDateTime.currentDateTime().toString('hh-mm-ss')) \
@@ -379,10 +343,35 @@ class Widget(QtWidgets.QWidget):
                 
     def clear(self, event):
         self.output_te.clear()
-
+    
+    def closeEvent(self, event):
+        # Stop the timer
+        self.timer.stop()
+        
+        # Close the serial port if open
+        if self.serial and self.serial.isOpen():
+            self.serial.close()
+        
+        # Disconnect BLE if connected
+        if self.useBLE and self.connected:
+            self.ble.disconnect()
+        
+        # Close the CSV file if open
+        if self.file:
+            self.file.close()
+        
+        # Accept the event to close the window
+        event.accept()
 
 if __name__ == '__main__':
-    import sys
+    # command line arguments (overwrite options from config file)
+    parser = argparse.ArgumentParser(description='Liveplot from serial port')
+    parser.add_argument("--com", help="COM Port", default=None)
+    parser.add_argument("--plots", type=int, help="Number of Plots", default=None)
+    parser.add_argument("--samples", type=int, help="Number of samples per plot", default=None)
+    parser.add_argument("--config", help="config file", default=None)
+
+    args = parser.parse_args()
     app = pyqtgraph.Qt.mkQApp() # see https://github.com/pyqtgraph/pyqtgraph/pull/1509, works for me
     loop = QEventLoop(app)
     asyncio.set_event_loop(loop)

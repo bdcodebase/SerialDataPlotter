@@ -2,11 +2,22 @@
 # enables the user to write multiple CSV files with same starting time
 # just provide the config file for each instance and press the button next to it
 import sys
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QLabel, QLineEdit
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QLabel, QLineEdit
 from SerialDataPlotter import Widget as SerialDataPlotterWidget
 from qasync import QEventLoop
 import asyncio
 import pyqtgraph
+import argparse
+
+# Command line arguments for config file paths
+parser = argparse.ArgumentParser(description='Multiple SDP Launcher')
+parser.add_argument('--config1', help='Path to config file for instance 1', default=None)
+parser.add_argument('--config2', help='Path to config file for instance 2', default=None)
+parser.add_argument('--config3', help='Path to config file for instance 3', default=None)
+parser.add_argument('--config4', help='Path to config file for instance 4', default=None)
+args = parser.parse_args()
+
+
 
 class MultipleSDPLauncher(QWidget):
     def __init__(self):
@@ -21,19 +32,19 @@ class MultipleSDPLauncher(QWidget):
 
         self.config_edits = []
         self.config_buttons = []
+        config_paths = [args.config1, args.config2, args.config3, args.config4]
         for i in range(4):
             h_layout = QHBoxLayout()
             
             button = QPushButton(f'Select Config {i+1}')
             button.clicked.connect(lambda _, idx=i: self.select_config(idx))
             self.config_buttons.append(button)
-            h_layout.addWidget(button)
 
-            edit = QLineEdit(f'Config {i+1}: Not selected')
+            edit = QLineEdit(config_paths[i] if config_paths[i] else f'Config {i+1}: Not selected')
             self.config_edits.append(edit)
             h_layout.addWidget(edit)
 
-
+            h_layout.addWidget(button)
 
             layout.addLayout(h_layout)
 
@@ -79,8 +90,8 @@ class MultipleSDPLauncher(QWidget):
             instance.write_to_csv()
 
 if __name__ == '__main__':
-    app = pyqtgraph.Qt.mkQApp() 
     #app = QApplication(sys.argv)
+    app = pyqtgraph.mkQApp()
     loop = QEventLoop(app)
     asyncio.set_event_loop(loop)
     launcher = MultipleSDPLauncher()
