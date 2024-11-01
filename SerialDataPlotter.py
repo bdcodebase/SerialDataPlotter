@@ -38,31 +38,40 @@ parser.add_argument("--config", help="config file", default=None)
 args = parser.parse_args()
 configlog = '[-PC-] Welcome! Starting session at ' + QtCore.QDateTime.currentDateTime().toString('yyyy-MM-dd hh:mm:ss')
 
-if args.config is not None:
-    try:    
-        config = SDP.parseconfig(args.config) 
-    except (json.JSONDecodeError, FileNotFoundError) as e:
-        config = SDP.getdefaultconfig()
-        configlog = configlog + f'\n[-PC-] Error reading config file "{args.config}": {e}. Using default config.'
-else:
-    config = SDP.getdefaultconfig()
+# if args.config is not None:
+#     try:    
+#         config = SDP.parseconfig(args.config) 
+#     except (json.JSONDecodeError, FileNotFoundError) as e:
+#         config = SDP.getdefaultconfig()
+#         configlog = configlog + f'\n[-PC-] Error reading config file "{args.config}": {e}. Using default config.'
+# else:
+#     config = SDP.getdefaultconfig()
 
 
 class Widget(QtWidgets.QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, config_file=None, com=None, plots=None, samples=None):
         super(Widget, self).__init__(parent)
-        self.setWindowTitle(config['title'])
+        self.config = self.load_config(config_file)
+        
+        if com is not None:
+            self.config['com'] = com
+        if plots is not None:
+            self.config['plots'] = plots
+        if samples is not None:
+            self.config['samples'] = samples    
+        
+        self.setWindowTitle(self.config['title'])
         # Set up the basic variables
-        if args.com is not None: # command line argument has higher priority
-            config['com'] = args.com
+        # if args.com is not None: # command line argument has higher priority
+        #     config['com'] = args.com
      
-        if args.plots is not None:  # command line argument has higher priority
-            config['plots'] = args.plots
+        # if args.plots is not None:  # command line argument has higher priority
+        #     config['plots'] = args.plots
        
-        if args.samples is not None: # command line argument has higher priority
-            config['samples'] = args.samples
+        # if args.samples is not None: # command line argument has higher priority
+        #     config['samples'] = args.samples
          
-        self.fastautoscale = True if config['autoscaleinterval'] > 0 else False
+        self.fastautoscale = True if self.config['autoscaleinterval'] > 0 else False
 
         self.ble = BLE.BLE()
         self.useBLE = False
@@ -78,9 +87,9 @@ class Widget(QtWidgets.QWidget):
         self.margin = 2.5
 
         self.data = []
-        for i in range(config['plots']):
-            self.data.append([0]*config['samples'])
-            #self.data[i][config['samples']-1] = 1
+        for i in range(self.config['plots']):
+            self.data.append([0]*self.config['samples'])
+            #self.data[i][self.config['samples']-1] = 1
 
         # Set up the user interface: Tab 1
         self.message_le = QtWidgets.QLineEdit(
@@ -92,7 +101,7 @@ class Widget(QtWidgets.QWidget):
             clicked=self.send
         )
         
-        self.comport_le = QtWidgets.QLineEdit(config['com'])
+        self.comport_le = QtWidgets.QLineEdit(self.config['com'])
         self.connect_btn = QtWidgets.QPushButton(
             text="Connect", 
             checkable=True,
@@ -108,23 +117,23 @@ class Widget(QtWidgets.QWidget):
         self.output_te.setStyleSheet("font-size: 10pt; color: white; background-color: black; font-family: 'Courier New';")
         self.raw_cb = QtWidgets.QCheckBox('Show Raw Data')
 
-        QtGraph.setConfigOption('background', config['background'])  # Set the default background color
-        QtGraph.setConfigOption('foreground', config['foreground'])
+        QtGraph.setConfigOption('background', self.config['background'])  # Set the default background color
+        QtGraph.setConfigOption('foreground', self.config['foreground'])
         
         self.graph = QtGraph.GraphicsLayoutWidget()
-        if config['framecolor'] is not None:
-            self.graph.setStyleSheet(F"border: 5px solid {config['framecolor']};")
+        if self.config['framecolor'] is not None:
+            self.graph.setStyleSheet(F"border: 5px solid {self.config['framecolor']};")
 
         font = QtGraph.QtGui.QFont()
         font.setPixelSize(12)
         
-        for i in range(config['plots']):
+        for i in range(self.config['plots']):
             self.ax.append(self.graph.addPlot(row=i, col=0)) 
             self.plt.append(self.ax[i].plot(self.data[i][:]))
-            self.ax[i].setLabel('left', f'<div style="font-size: 11pt">{config["channels"][i]["label"]}<\div>')
-            self.ax[i].setXRange(0, config['samples'])
+            self.ax[i].setLabel('left', f'<div style="font-size: 11pt">{self.config["channels"][i]["label"]}<\div>')
+            self.ax[i].setXRange(0, self.config['samples'])
             
-            self.plt[i].setPen(config['channels'][i]['color'], width=2)
+            self.plt[i].setPen(self.config['channels'][i]['color'], width=2)
             self.ax[i].showGrid(x=True, y=True)
             self.ax[i].getAxis('left').setStyle(tickFont = font)
             self.ax[i].getAxis('bottom').setStyle(tickFont = font)
@@ -136,7 +145,7 @@ class Widget(QtWidgets.QWidget):
             self.label_items[i].anchor(itemPos=(0.9, 0.0), parentPos=(0.9, 0.0))
 
 
-        self.ax[config['plots']-1].setLabel('bottom','Samples')
+        self.ax[self.config['plots']-1].setLabel('bottom','Samples')
 
         # Create the main layout
         main_layout = QtWidgets.QVBoxLayout(self)
@@ -164,7 +173,7 @@ class Widget(QtWidgets.QWidget):
             clicked=self.write_to_csv
         )
 
-        self.csvpath_le = QtWidgets.QLineEdit(config['csvpath'])
+        self.csvpath_le = QtWidgets.QLineEdit(self.config['csvpath'])
         
         tab1_layout.addWidget(self.write_csv_btn, 0, 3)
         tab1_layout.addWidget(self.csvpath_le, 0, 4)
@@ -187,14 +196,14 @@ class Widget(QtWidgets.QWidget):
         tab3_layout = QtWidgets.QGridLayout(tab3)
         # # Add CSV path edit field
         # tab3_layout.addWidget(QtWidgets.QLabel("CSV Path:"), 0, 0)
-        # self.csvpath_le = QtWidgets.QLineEdit(config['csvpath'])
+        # self.csvpath_le = QtWidgets.QLineEdit(self.config['csvpath'])
         # tab3_layout.addWidget(self.csvpath_le, 0, 1)
 
 
 
         tab3_layout.addWidget(QtWidgets.QLabel("Config file:"),0,0)
         tab3_layout.addWidget(self.config_te,1,0)
-        self.config_te.setPlainText(json.dumps(config, indent=4))
+        self.config_te.setPlainText(json.dumps(self.config, indent=4))
 
         tab_widget.addTab(tab3, "Config")
 
@@ -206,9 +215,19 @@ class Widget(QtWidgets.QWidget):
       
         # Set up the timer for updating the plot
         self.timer = QtCore.QTimer()
-        self.timer.setInterval(config['refresh'])
+        self.timer.setInterval(self.config['refresh'])
         self.timer.timeout.connect(self.update_plot)
         self.timer.start()
+
+    def load_config(self, config_file):
+        if config_file:
+            try:
+                return SDP.parseconfig(config_file)
+            except (json.JSONDecodeError, FileNotFoundError) as e:
+                print(f'Error reading config file "{config_file}": {e}. Using default config.')
+                return SDP.getdefaultconfig()
+        else:
+            return SDP.getdefaultconfig()
 
     def open_ble_scanner(self):
         self.ble_scanner_window = BLEScannerWindow()
@@ -223,18 +242,18 @@ class Widget(QtWidgets.QWidget):
 
     #@QtCore.pyqtSlot()
     def parseLine(self, line):
-        values = line.split(config['delimiter'])
+        values = line.split(self.config['delimiter'])
         try:
-            for i in range(config['plots']):
-                self.data[i][self.idx] = (float(values[i])-config['channels'][i]['offset'])*config['channels'][i]['scale_factor']
+            for i in range(self.config['plots']):
+                self.data[i][self.idx] = (float(values[i])-self.config['channels'][i]['offset'])*self.config['channels'][i]['scale_factor']
             if self.file is not None:
-                for i in range(config['plots']-1):
+                for i in range(self.config['plots']-1):
                     self.file.write(F'{self.data[i][self.idx]};')
-                self.file.write(F"{self.data[config['plots']-1][self.idx]}\n")  
+                self.file.write(F"{self.data[self.config['plots']-1][self.idx]}\n")  
             self.idx += 1         
         except: # either no float or not (enough) data: just throw to terminal log.
             self.output_te.append(line.rstrip('\r\n'))
-        if self.idx >= config['samples']:
+        if self.idx >= self.config['samples']:
             self.idx = 0
 
     def receive(self,sender=None,data=None):
@@ -286,11 +305,11 @@ class Widget(QtWidgets.QWidget):
                     baudRate=QtSerialPort.QSerialPort.Baud115200,
                     readyRead=self.receive
                 )   
-                config['com'] = address
+                self.config['com'] = address
                 if not self.serial.isOpen():
                     if not self.serial.open(QtCore.QIODevice.ReadWrite):
                         self.connect_btn.setChecked(False)
-                        self.output_te.append(F"[-PC-]  Failed to connect to {config['com']}")
+                        self.output_te.append(F"[-PC-]  Failed to connect to {self.config['com']}")
                     else:
                         self.connected = True
         else:
@@ -304,16 +323,16 @@ class Widget(QtWidgets.QWidget):
        
     def write_to_csv(self):
         if self.file is None:
-            #filename = config['csvpath'].replace('<home>', os.path.expanduser('~'))
+            #filename = self.config['csvpath'].replace('<home>', os.path.expanduser('~'))
             filename = self.csvpath_le.text().replace('<home>', os.path.expanduser('~')) \
                                              .replace('<date>', QtCore.QDateTime.currentDateTime().toString('yyyy-MM-dd')) \
                                              .replace('<time>', QtCore.QDateTime.currentDateTime().toString('hh-mm-ss')) \
                                              .replace('/', os.sep)  # for windows compatibility
             try:
                 self.file =  open(filename, 'w')
-                for i in range(config['plots']-1):
-                    self.file.write(F'{config["channels"][i]["label"]};')
-                self.file.write(F'{config["channels"][config["plots"]-1]["label"]}\n')
+                for i in range(self.config['plots']-1):
+                    self.file.write(F'{self.config["channels"][i]["label"]};')
+                self.file.write(F'{self.config["channels"][self.config["plots"]-1]["label"]}\n')
                 self.output_te.append(F'[-PC-] Writing data to {filename}')
                 self.write_csv_btn.setText('Stop writing')
                 
@@ -329,34 +348,34 @@ class Widget(QtWidgets.QWidget):
 
     def update_plot(self):
         if self.connected:
-            for i in range(config['plots']):
+            for i in range(self.config['plots']):
                 idx = self.idx - 1
                 if idx < 0:
-                    idx = config['samples'] - 1
+                    idx = self.config['samples'] - 1
                 self.plt[i].setData(self.data[i][:])
 
-                if config['channels'][i]['min'] is not None and config['channels'][i]['max'] is not None:
-                    self.ax[i].setYRange(config['channels'][i]['min'], config['channels'][i]['max'])
+                if self.config['channels'][i]['min'] is not None and self.config['channels'][i]['max'] is not None:
+                    self.ax[i].setYRange(self.config['channels'][i]['min'], self.config['channels'][i]['max'])
                 else:
                     if self.fastautoscale:
-                        if idx>config['autoscaleinterval']:
-                            newmin = min(self.data[i][idx-config['autoscaleinterval']:idx])
-                            newmax = max(self.data[i][idx-config['autoscaleinterval']:idx])
+                        if idx>self.config['autoscaleinterval']:
+                            newmin = min(self.data[i][idx-self.config['autoscaleinterval']:idx])
+                            newmax = max(self.data[i][idx-self.config['autoscaleinterval']:idx])
                             if newmax == newmin:
                                 newmax = newmax + 1
                             margin = (newmax - newmin) / self.margin
                             self.ax[i].setYRange(newmin - margin, newmax + margin)
                         else:
                             if idx > 0:
-                                newmin = min(min(self.data[i][0:idx]),min(self.data[i][idx-config['autoscaleinterval']:]))
-                                newmax = max(max(self.data[i][0:idx]),max(self.data[i][idx-config['autoscaleinterval']:]))
+                                newmin = min(min(self.data[i][0:idx]),min(self.data[i][idx-self.config['autoscaleinterval']:]))
+                                newmax = max(max(self.data[i][0:idx]),max(self.data[i][idx-self.config['autoscaleinterval']:]))
                                 if newmax == newmin:
                                     newmax = newmax + 1
                                 margin = (newmax-newmin)/self.margin
                                 self.ax[i].setYRange(newmin-margin,newmax+margin)
                 # Update the text item with the current value
                 current_value = self.data[i][idx]
-                self.label_items[i].setText(f'<div style="font-size: 11pt;color: {config["channels"][i]["color"]}">{current_value:.2f}<\div>')
+                self.label_items[i].setText(f'<div style="font-size: 11pt;color: {self.config["channels"][i]["color"]}">{current_value:.2f}<\div>')
                 
     def clear(self, event):
         self.output_te.clear()
@@ -367,7 +386,7 @@ if __name__ == '__main__':
     app = pyqtgraph.Qt.mkQApp() # see https://github.com/pyqtgraph/pyqtgraph/pull/1509, works for me
     loop = QEventLoop(app)
     asyncio.set_event_loop(loop)
-    w = Widget()
+    w = Widget(config_file=args.config, com=args.com, plots=args.plots, samples=args.samples)
     w.show()
     with loop:
         loop.run_forever()
