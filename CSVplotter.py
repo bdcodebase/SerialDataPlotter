@@ -12,7 +12,6 @@ class OptionsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle('Plot Options')
-        
 
         layout = QVBoxLayout()
 
@@ -103,9 +102,14 @@ class CSVPlotter(QMainWindow):
         fileMenu.addAction(optionsAction)
 
         # Add open file menu item
-        openFileAction = QAction('Open', self)
+        openFileAction = QAction('Open CSV', self)
         openFileAction.triggered.connect(self.open_file)
         fileMenu.addAction(openFileAction)
+
+        # Add add file menu item
+        addFileAction = QAction('Add CSV', self)
+        addFileAction.triggered.connect(self.add_file)
+        fileMenu.addAction(addFileAction)
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -128,15 +132,15 @@ class CSVPlotter(QMainWindow):
             self.background_color = options_dialog.background_color.name()
             self.pen_colors = options_dialog.color_order_edit.text().split(',')
             self.use_first_column_as_x = options_dialog.use_first_column_as_x_checkbox.isChecked()
-        if self.fileName:
-            # Clear existing plots
-            for i in reversed(range(self.layout.count())):
-                widget = self.layout.itemAt(i).widget()
-                if widget is not None:
-                    widget.deleteLater()
-            self.plot_csv()
+            if self.fileName:
+                # Clear existing plots
+                for i in reversed(range(self.layout.count())):
+                    widget = self.layout.itemAt(i).widget()
+                    if widget is not None:
+                        widget.deleteLater()
+                self.plot_csv()
 
-    def open_file(self):
+    def open_file(self, event=None):
         for i in reversed(range(self.layout.count())):
             widget = self.layout.itemAt(i).widget()
             if widget is not None:
@@ -146,11 +150,19 @@ class CSVPlotter(QMainWindow):
         if self.fileName:
             self.plot_csv()
 
+    def add_file(self):
+        options = QFileDialog.Options()
+        self.fileName, _ = QFileDialog.getOpenFileName(self, "Add CSV File", "", "CSV Files (*.csv);;All Files (*)", options=options)
+        if self.fileName:
+            self.plot_csv() 
+
     def plot_csv(self):
         data = pd.read_csv(self.fileName, delimiter=self.delimiter)
 
         # Create a list to hold all plot widgets
         plotWidgets = []
+        pg.setConfigOption('background', self.background_color)  # Set the default background color
+        pg.setConfigOption('foreground', self.foreground_color)
 
         # Check if the first row contains column labels
         if all(isinstance(col, str) for col in data.columns):
@@ -160,17 +172,25 @@ class CSVPlotter(QMainWindow):
             else:
                 x_values = data.index
 
+            font = pg.QtGui.QFont()
+            font.setPixelSize(11)
+            
             for i, column in enumerate(data.columns):
                 plotWidget = pg.PlotWidget()
                 plotWidget.setBackground(self.background_color)
                 plotWidget.getAxis('left').setPen(self.foreground_color)
                 plotWidget.getAxis('bottom').setPen(self.foreground_color)
                 plotWidget.showGrid(x=self.grid_visible, y=self.grid_visible)
-                pen_color = self.pen_colors[i % len(self.pen_colors)]
-                plotWidget.plot(x_values, data[column], pen=pen_color, name=column)
-                plotWidget.setLabel('left', column, color=self.foreground_color)
+                plotWidget.getAxis('left').setStyle(tickFont = font)
+                plotWidget.getAxis('bottom').setStyle(tickFont = font)
+            
+                cplt = plotWidget.plot(x_values, data[column], name=column)
+                cplt.setPen(self.pen_colors[i % len(self.pen_colors)], width=2)
+                plotWidget.setLabel('left', f'<div style="font-size: 10pt">{column}<\div>')
                 if i == len(data.columns) - 1:
-                    plotWidget.setLabel('bottom', 'Samples' if not self.use_first_column_as_x else data.columns[0], color=self.foreground_color)
+                    plotWidget.setLabel('bottom', f'Samples | File:{self.fileName}' \
+                                        if not self.use_first_column_as_x else f'Time | File:{self.fileName}')
+                    #plotWidget.setLabel('bottom', 'Samples' if not self.use_first_column_as_x else data.columns[0], color=self.foreground_color)
                 self.layout.addWidget(plotWidget)
                 plotWidgets.append(plotWidget)
         else: # support for non-string column labels
