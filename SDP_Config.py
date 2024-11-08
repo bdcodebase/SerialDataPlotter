@@ -30,6 +30,9 @@ def getdefaultconfig():
         "delimiter": ";",
         "autoscaleinterval": 150,
         "csvpath": "<home>/Documents/data_<date>_<time>.csv",
+        "cmdstartwritecsv": null,
+        "cmdstopwritecsv": null,
+        "cmdconnect": null,
         "channels": [
             {
                 "label": "Channel 1",

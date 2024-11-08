@@ -39,7 +39,7 @@ class BLE:
     async def send_data(self, data):
         if self.client:
             await self.client.write_gatt_char(self.tx_char_uuid, data)
-            print(f"Sent data: {data}")
+            #print(f"Sent data: {data}")
 
     def notification_handler(self, sender, data):
         print(f"Received data: {data}")

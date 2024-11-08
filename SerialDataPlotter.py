@@ -6,6 +6,8 @@
 # ToDo:
 # - add custom filtering
 # - add option and handling for time axis/time stamps
+# - add sending a command to device on connect
+# - add sending a command to device when starting/stopping writing to csv
 # won't do - add "save and restart" option in "config" tab
 # done - BLE support
 # done - add check for valid json in config file
@@ -251,6 +253,19 @@ class Widget(QtWidgets.QWidget):
                 self.output_te.append(F'[-PC-] => {self.message_le.text()}')
         else:
             self.output_te.append('[-PC-] Error: Not connected')
+    
+    def sendCommand(self,command):
+        command = command.replace('<date>', QtCore.QDateTime.currentDateTime().toString('yyyy-MM-dd'))\
+                .replace('<time>', QtCore.QDateTime.currentDateTime().toString('hh-mm-ss')) 
+        if self.connected:
+            if self.useBLE:
+                self.ble.send_data(command.encode())
+                self.output_te.append(F'[-PC-] => {command}')
+            else:
+                self.serial.write(command.encode() + b'\r\n')
+                self.output_te.append(F'[-PC-] => {command}')
+        else:
+            self.output_te.append('[-PC-] Error: Not connected')
 
     @asyncSlot(bool)
     async def on_toggled(self,checked):
@@ -277,6 +292,8 @@ class Widget(QtWidgets.QWidget):
                         self.output_te.append(F"[-PC-]  Failed to connect to {self.config['com']}")
                     else:
                         self.connected = True
+            if self.config['cmdconnect'] is not None:
+                self.sendCommand(self.config['cmdconnect'])
         else:
             if self.useBLE:
                 self.output_te.append(F"[-PC-] Disconnecting BLE")
@@ -299,7 +316,8 @@ class Widget(QtWidgets.QWidget):
                 self.file.write(F'{self.config["channels"][self.config["plots"]-1]["label"]}\n')
                 self.output_te.append(F'[-PC-] Writing data to {filename}')
                 self.write_csv_btn.setText('Stop writing')
-                
+                if self.config['cmdstartwritecsv'] is not None:        
+                    self.sendCommand(self.config['cmdstartwritecsv'])
             except:
                 self.output_te.append(F'[-PC-] Error writing to {filename}')
                 self.file = None
@@ -308,6 +326,8 @@ class Widget(QtWidgets.QWidget):
             self.file = None
             self.output_te.append(F'[-PC-] Stopped writing to CSV')
             self.write_csv_btn.setText('Write to CSV')
+            if self.config['cmdstopwritecsv'] is not None:
+                self.sendCommand(self.config['cmdstopwritecsv'])
 
 
     def update_plot(self):
