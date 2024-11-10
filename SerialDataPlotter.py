@@ -131,7 +131,7 @@ class Widget(QtWidgets.QWidget):
         main_layout = QtWidgets.QVBoxLayout(self)
         # Create the tab widget
         tab_widget = QtWidgets.QTabWidget()
-        tab_widget.setMinimumSize(800, 600)
+        tab_widget.setMinimumSize(600, 350)
         tab_widget.setTabPosition(QtWidgets.QTabWidget.TabPosition.West)
 
         # First tab
@@ -187,6 +187,9 @@ class Widget(QtWidgets.QWidget):
 
         # Set the main layout as the layout for the main window
         self.setLayout(main_layout)
+
+        if self.config['autostart']:
+            self.on_toggled(True)
 
 
     def load_config(self, config_file):
@@ -382,6 +385,11 @@ class Widget(QtWidgets.QWidget):
         
         # Accept the event to close the window
         event.accept()
+
+
+    def start_plot_from_0(self):
+        self.idx = 0
+
 
 if __name__ == '__main__':
     # command line arguments (overwrite options from config file)

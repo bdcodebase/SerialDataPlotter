@@ -25,6 +25,7 @@ def getdefaultconfig():
         "framecolor": null,
         "com": "COM3",
         "plots": 3,
+        "autostart": false,
         "samples": 500,
         "refresh": 40,
         "delimiter": ";",
