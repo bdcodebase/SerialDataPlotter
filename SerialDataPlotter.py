@@ -6,12 +6,12 @@
 # ToDo:
 # - add custom filtering
 # - add option and handling for time axis/time stamps
-# - add sending a command to device on connect
-# - add sending a command to device when starting/stopping writing to csv
 # won't do - add "save and restart" option in "config" tab
 # done - BLE support
 # done - add check for valid json in config file
 # done - add compatibility function for older config files
+# done - add sending a command to device on connect
+# done sending a command to device when starting/stopping writing to csv
 #
 # config file is a json file, see SDP_Config.py for structure
 
@@ -70,8 +70,8 @@ class Widget(QtWidgets.QWidget):
         self.ax = []    # list of axes
         self.plt = []   # list of plots
         self.label_items = []  # list of label items for live values
-
         self.margin = 2.5
+
         self.message_le = QtWidgets.QLineEdit(
             text="h",
             returnPressed=self.send)
@@ -83,19 +83,28 @@ class Widget(QtWidgets.QWidget):
         
         self.comport_le = QtWidgets.QLineEdit(self.config['com'])
         self.connect_btn = QtWidgets.QPushButton(
-            text="Connect", 
+            text="Connect to:", 
             checkable=True,
             toggled=self.on_toggled
         )
-        
-        # Set up the user interface: Tab 3
-        self.config_te = QtWidgets.QTextEdit(readOnly=True)
 
-        # Set up the user interface: Tab 2
+        self.scan_ble_btn = QtWidgets.QPushButton(
+            text="Scan BLE",
+            clicked=self.open_ble_scanner
+        )
+
+        self.config_te = QtWidgets.QTextEdit(readOnly=True)
         self.output_te = QtWidgets.QTextEdit(readOnly=True)
         self.output_te.mouseDoubleClickEvent = self.clear
         self.output_te.setStyleSheet("font-size: 10pt; color: white; background-color: black; font-family: 'Courier New';")
         self.raw_cb = QtWidgets.QCheckBox('Show Raw Data')
+
+        self.write_csv_btn = QtWidgets.QPushButton(
+            text="Write to CSV:",
+            clicked=self.write_to_csv
+        )
+
+        self.csvpath_le = QtWidgets.QLineEdit(self.config['csvpath'])
 
         QtGraph.setConfigOption('background', self.config['background'])  # Set the default background color
         QtGraph.setConfigOption('foreground', self.config['foreground'])
@@ -136,45 +145,31 @@ class Widget(QtWidgets.QWidget):
 
         # First tab
         tab1 = QtWidgets.QWidget()
-        tab1_layout = QtWidgets.QGridLayout(tab1)
-        tab1_layout.addWidget(self.connect_btn, 0, 0)
-        tab1_layout.addWidget(self.comport_le, 0, 1)
-        # Add BLE scan button
-        self.scan_ble_btn = QtWidgets.QPushButton(
-            text="Scan BLE",
-            clicked=self.open_ble_scanner
-        )
-        tab1_layout.addWidget(self.scan_ble_btn, 0, 2)
+        tab_layout = QtWidgets.QVBoxLayout(tab1)
+        tab_layout.addWidget(self.graph)  # Assuming self.plot_widget is the plot
 
-        #tab3_layout.addWidget(QtWidgets.QLabel("CSV Path:"), 0, 0)
-        
-        self.write_csv_btn = QtWidgets.QPushButton(
-            text="Write to CSV",
-            clicked=self.write_to_csv
-        )
-
-        self.csvpath_le = QtWidgets.QLineEdit(self.config['csvpath'])
-        
-        tab1_layout.addWidget(self.write_csv_btn, 0, 3)
-        tab1_layout.addWidget(self.csvpath_le, 0, 4)
-
-        tab1_layout.addWidget(self.graph, 1, 0, 1, 5)
         tab_widget.addTab(tab1, "Graph")
 
-        # Second tab
+        # second tab
         tab2 = QtWidgets.QWidget()
-        tab2_layout = QtWidgets.QGridLayout(tab2)
-        tab2_layout.addWidget(self.raw_cb, 0, 2)
-        tab2_layout.addWidget(self.send_btn, 0, 0)
-        tab2_layout.addWidget(self.message_le, 0, 1)
-        tab2_layout.addWidget(self.output_te, 1, 0, 1, 2)
+        tab_layout = QtWidgets.QGridLayout(tab2)
+        tab_layout.addWidget(self.connect_btn, 0, 0)
+        tab_layout.addWidget(self.comport_le, 0, 1)
+        tab_layout.addWidget(self.scan_ble_btn, 0, 2)
+        tab_layout.addWidget(self.write_csv_btn, 1, 0)
+        tab_layout.addWidget(self.csvpath_le, 1, 1)
+        tab_layout.addWidget(self.send_btn, 2, 0)
+        tab_layout.addWidget(self.message_le, 2, 1)
+        tab_layout.addWidget(self.raw_cb, 2, 2)
+        tab_layout.addWidget(self.output_te, 3, 0, 1, 2)
         self.output_te.setPlainText('[-PC-] Welcome! Starting session at ' + QtCore.QDateTime.currentDateTime().toString('yyyy-MM-dd hh:mm:ss'))
-        
-    
+
         tab_widget.addTab(tab2, "Terminal")
 
         # Third tab
+
         tab3 = QtWidgets.QWidget()
+        tab_widget.currentChanged.connect(lambda index: self.refresh_config() if tab_widget.tabText(index) == "Config" else None)
         tab3_layout = QtWidgets.QGridLayout(tab3)
         tab3_layout.addWidget(QtWidgets.QLabel("Config file:"),0,0)
         tab3_layout.addWidget(self.config_te,1,0)
@@ -191,6 +186,10 @@ class Widget(QtWidgets.QWidget):
         if self.config['autostart']:
             self.on_toggled(True)
 
+    def refresh_config(self):
+        self.config['csvpath'] = self.csvpath_le.text()
+        self.config['com'] = self.comport_le.text()
+        self.config_te.setPlainText(json.dumps(self.config, indent=4))
 
     def load_config(self, config_file):
         if config_file:
@@ -295,7 +294,7 @@ class Widget(QtWidgets.QWidget):
                         self.output_te.append(F"[-PC-]  Failed to connect to {self.config['com']}")
                     else:
                         self.connected = True
-            if self.config['cmdconnect'] is not None:
+            if self.config['cmdconnect'] is not None and self.connected:
                 self.sendCommand(self.config['cmdconnect'])
         else:
             if self.useBLE:
@@ -319,6 +318,7 @@ class Widget(QtWidgets.QWidget):
                 self.file.write(F'{self.config["channels"][self.config["plots"]-1]["label"]}\n')
                 self.output_te.append(F'[-PC-] Writing data to {filename}')
                 self.write_csv_btn.setText('Stop writing')
+                self.setWindowTitle(self.config['title'] + F' - Writing to {filename}')
                 if self.config['cmdstartwritecsv'] is not None:        
                     self.sendCommand(self.config['cmdstartwritecsv'])
             except:
@@ -329,6 +329,7 @@ class Widget(QtWidgets.QWidget):
             self.file = None
             self.output_te.append(F'[-PC-] Stopped writing to CSV')
             self.write_csv_btn.setText('Write to CSV')
+            self.setWindowTitle(self.config['title'])
             if self.config['cmdstopwritecsv'] is not None:
                 self.sendCommand(self.config['cmdstopwritecsv'])
 
